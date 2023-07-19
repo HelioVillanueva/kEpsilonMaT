@@ -76,7 +76,6 @@ SourceFiles
 
 #include "RASModel.H"
 #include "eddyViscosity.H"
-//#include "fluidThermo.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -113,8 +112,6 @@ protected:
             word CpName_;
             word CvName_;
 
-        //- Thermo package
-         //const fluidThermo& thermo_;
 
         // Fields
 

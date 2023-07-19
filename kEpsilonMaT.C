@@ -191,7 +191,6 @@ kEpsilonMaT<BasicMomentumTransportModel>::kEpsilonMaT
         phi,
         viscosity
     ),
-    //thermo_(this->mesh_.lookupObject<fluidThermo>(physicalProperties::typeName)),
     Mat0_
     (
         dimensioned<scalar>::lookupOrAddToDict
@@ -255,10 +254,9 @@ kEpsilonMaT<BasicMomentumTransportModel>::kEpsilonMaT
             1.3
         )
     ),
-    //thermo_(),
-    TName_("T"),
-    CpName_("Cp"),
-    CvName_("Cv"),
+    TName_(IOobject::groupName("T", alphaRhoPhi.group())),
+    CpName_(IOobject::groupName("Cp", alphaRhoPhi.group())),
+    CvName_(IOobject::groupName("Cv", alphaRhoPhi.group())),
 
     k_
     (
@@ -292,20 +290,6 @@ kEpsilonMaT<BasicMomentumTransportModel>::kEpsilonMaT
     {
         this->printCoeffs(type);
     }
-
-    Info<<"Modelo de turbulencia"<<endl;
-    if (this->coeffDict_.found("T"))
-    {
-        TName_ = word(this->coeffDict_.lookup("T"));
-    }
-    if (this->coeffDict_.found("Cp"))
-    {
-        CpName_ = word(this->coeffDict_.lookup("Cp"));
-    }
-    if (this->coeffDict_.found("Cv"))
-    {
-        CvName_ = word(this->coeffDict_.lookup("Cv"));
-    }
 }
 
 
@@ -323,9 +307,6 @@ bool kEpsilonMaT<BasicMomentumTransportModel>::read()
         C3_.readIfPresent(this->coeffDict());
         sigmak_.readIfPresent(this->coeffDict());
         sigmaEps_.readIfPresent(this->coeffDict());
-        this->coeffDict().readIfPresent("T",TName_);
-        this->coeffDict().readIfPresent("Cp",CpName_);
-        this->coeffDict().readIfPresent("Cv",CvName_);
 
         return true;
     }
