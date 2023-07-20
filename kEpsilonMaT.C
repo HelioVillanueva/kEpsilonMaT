@@ -38,19 +38,12 @@ namespace RASModels
 // * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
 
 template<class BasicMomentumTransportModel>
-tmp<volScalarField::Internal> kEpsilonMaT<BasicMomentumTransportModel>::Matk
+tmp<volScalarField> kEpsilonMaT<BasicMomentumTransportModel>::aU
 (
-    const volScalarField& Cp,
-    const volScalarField& Cv,
-    const volScalarField& p
+    const fluidThermo& thermo
 ) const
 {
-    // specific heat ratio
-    const volScalarField::Internal gamma = Cp/Cv;
-    // acoustic velocity m/s
-    const volScalarField::Internal a = sqrt(gamma*p/this->rho_);
-
-    return sqrt(2*k_.v())/a;
+    return sqrt(thermo.gamma()*thermo.p()/this->rho_);
 }
 
 
@@ -74,22 +67,20 @@ tmp<volScalarField> kEpsilonMaT<BasicMomentumTransportModel>::fMat
 template<class BasicMomentumTransportModel>
 tmp<volScalarField> kEpsilonMaT<BasicMomentumTransportModel>::rCmu
 (
-    const volScalarField& T,
-    const volScalarField& Cp,
-    const volScalarField& Cv,
-    const volScalarField& p
+    const fluidThermo& thermo
 )
 {
-    // specific heat ratio
-    const volScalarField gamma = Cp/Cv;
     // acoustic velocity m/s
-    const volScalarField a = sqrt(gamma*p/this->rho_);
+    const volScalarField a = aU(thermo);
     // Mach number
     const volScalarField Ma = mag(this->U_)/a;
     // Turbulent Mach number
     const volScalarField Mat = sqrt(2*k_)/a;
     // total temperature   
-    const volScalarField Ttot = T*(1.0 + (gamma - 1)*sqr(Ma)/2);
+    const volScalarField Ttot
+    (
+        thermo.T()*(1.0 + (thermo.gamma() - 1)*sqr(Ma)/2)
+    );
 
     const volScalarField Tg
     (
@@ -105,13 +96,10 @@ tmp<volScalarField> kEpsilonMaT<BasicMomentumTransportModel>::rCmu
 template<class BasicMomentumTransportModel>
 void kEpsilonMaT<BasicMomentumTransportModel>::correctNut
 (
-    const volScalarField& T,
-    const volScalarField& Cp,
-    const volScalarField& Cv,
-    const volScalarField& p
+    const fluidThermo& thermo
 )
 {
-    this->nut_ = rCmu(T,Cp,Cv,p)*sqr(k_)/epsilon_;
+    this->nut_ = rCmu(thermo)*sqr(k_)/epsilon_;
     this->nut_.correctBoundaryConditions();
     fvConstraints::New(this->mesh_).constrain(this->nut_);
 }
@@ -120,20 +108,18 @@ void kEpsilonMaT<BasicMomentumTransportModel>::correctNut
 template<class BasicMomentumTransportModel>
 void kEpsilonMaT<BasicMomentumTransportModel>::correctNut()
 {
-    const volScalarField& T =
-        this->mesh_.objectRegistry::template 
-        lookupObject<volScalarField>(TName_);
-    const volScalarField& Cp =
-        this->mesh_.objectRegistry::template 
-        lookupObject<volScalarField>(CpName_);
-    const volScalarField& Cv =
+    const fluidThermo& thermo =
         this->mesh_.objectRegistry::template
-        lookupObject<volScalarField>(CvName_);
-    const volScalarField& p =
-        this->mesh_.objectRegistry::template
-        lookupObject<volScalarField>("p");
+        lookupObject<fluidThermo>
+        (
+            IOobject::groupName
+            (
+                physicalProperties::typeName, 
+                phaseName_
+            )
+        );
 
-    correctNut(T,Cp,Cv,p);
+    correctNut(thermo);
 }
 
 
@@ -254,15 +240,13 @@ kEpsilonMaT<BasicMomentumTransportModel>::kEpsilonMaT
             1.3
         )
     ),
-    TName_(IOobject::groupName("T", alphaRhoPhi.group())),
-    CpName_(IOobject::groupName("Cp", alphaRhoPhi.group())),
-    CvName_(IOobject::groupName("Cv", alphaRhoPhi.group())),
+    phaseName_(alphaRhoPhi.group()),
 
     k_
     (
         IOobject
         (
-            IOobject::groupName("k", alphaRhoPhi.group()),
+            IOobject::groupName("k", phaseName_),
             this->runTime_.timeName(),
             this->mesh_,
             IOobject::MUST_READ,
@@ -274,7 +258,7 @@ kEpsilonMaT<BasicMomentumTransportModel>::kEpsilonMaT
     (
         IOobject
         (
-            IOobject::groupName("epsilon", alphaRhoPhi.group()),
+            IOobject::groupName("epsilon", phaseName_),
             this->runTime_.timeName(),
             this->mesh_,
             IOobject::MUST_READ,
@@ -336,6 +320,19 @@ void kEpsilonMaT<BasicMomentumTransportModel>::correct()
     (
         Foam::fvConstraints::New(this->mesh_)
     );
+    // Access thermo model
+    const fluidThermo& thermo
+    (
+        this->mesh_.objectRegistry::template
+        lookupObject<fluidThermo>
+        (
+            IOobject::groupName
+            (
+                physicalProperties::typeName, 
+                phaseName_
+            )
+        )
+    );
 
     eddyViscosity<RASModel<BasicMomentumTransportModel>>::correct();
 
@@ -377,17 +374,7 @@ void kEpsilonMaT<BasicMomentumTransportModel>::correct()
     bound(epsilon_, this->epsilonMin_);
 
     // Turbulent Mach number for k source term
-    const volScalarField& Cp =
-        this->mesh_.objectRegistry::template 
-        lookupObject<volScalarField>(CpName_);
-    const volScalarField& Cv =
-        this->mesh_.objectRegistry::template 
-        lookupObject<volScalarField>(CvName_);
-    const volScalarField& p =
-        this->mesh_.objectRegistry::template 
-        lookupObject<volScalarField>("p");
-
-    const volScalarField::Internal MaT(this->Matk(Cp,Cv,p));
+    const volScalarField MaT = sqrt(2*k_)/aU(thermo);
 
     // Turbulent kinetic energy equation
     tmp<fvScalarMatrix> kEqn
@@ -399,7 +386,7 @@ void kEpsilonMaT<BasicMomentumTransportModel>::correct()
         alpha()*rho()*G
       - fvm::SuSp((2.0/3.0)*alpha()*rho()*divU, k_)
       - fvm::Sp(alpha()*rho()*epsilon_()/k_(), k_)
-      - fvm::Sp(alpha()*rho()*epsilon_()*sqr(MaT)/k_(), k_)
+      - fvm::Sp(alpha()*rho()*epsilon_()*sqr(MaT.v())/k_(), k_)
       + kSource()
       + fvModels.source(alpha, rho, k_)
     );
@@ -410,11 +397,7 @@ void kEpsilonMaT<BasicMomentumTransportModel>::correct()
     fvConstraints.constrain(k_);
     bound(k_, this->kMin_);
 
-    const volScalarField& T =
-        this->mesh_.objectRegistry::template 
-        lookupObject<volScalarField>(TName_);
-
-    correctNut(T,Cp,Cv,p);
+    correctNut(thermo);
 }
 
 

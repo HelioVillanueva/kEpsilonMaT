@@ -76,6 +76,7 @@ SourceFiles
 
 #include "RASModel.H"
 #include "eddyViscosity.H"
+#include "fluidThermo.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -108,10 +109,8 @@ protected:
             dimensionedScalar sigmaEps_;
 
         // Field names for multiphase
-            word TName_;
-            word CpName_;
-            word CvName_;
 
+            word phaseName_;
 
         // Fields
 
@@ -120,12 +119,10 @@ protected:
 
 
     // Protected Member Functions
-        // Turbulent Mach number for k source term
-        tmp<volScalarField::Internal> Matk
+        // acoustic velocity m/s
+        tmp<volScalarField> aU
         (
-            const volScalarField& Cp,
-            const volScalarField& Cv,
-            const volScalarField& p
+            const fluidThermo& thermo
         ) const;
         // f(Mat) for Cmu function
         tmp<volScalarField> fMat
@@ -135,18 +132,12 @@ protected:
         // Cmu function
         tmp<volScalarField> rCmu
         (
-            const volScalarField& T,
-            const volScalarField& Cp,
-            const volScalarField& Cv,
-            const volScalarField& p
+            const fluidThermo& thermo
         );
 
         virtual void correctNut
         (
-            const volScalarField& T,
-            const volScalarField& Cp,
-            const volScalarField& Cv,
-            const volScalarField& p
+            const fluidThermo& thermo
         );
 
         virtual void correctNut();
